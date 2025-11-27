@@ -1,0 +1,76 @@
+---
+- name: 1. CONSULTAR ULTIMA VERSION DE ONEAGENT EN DYANTATRACE API DE LINUX
+  hosts: localhost
+  connection: local
+
+  # Proxy a nivel de play (aplica a todas las tareas)
+  environment:
+    http_proxy: "http://10.0.14.10:8110"
+    https_proxy: "http://10.0.14.10:8110"
+
+  vars:
+    # --- Configuración Requerida ---
+    dt_environment_id: "djt24293"
+    dt_domain: "live.dynatrace.com"
+    oneagent_os: "unix" # Para LINUX
+    oneagent_arch: "x86"
+
+  tasks:
+    - name: A. Construir URL de Metadatos de la API
+      ansible.builtin.set_fact:
+        metainfo_url: "https://{{ dt_environment_id }}.{{ dt_domain }}/api/v1/deployment/installer/agent/{{ oneagent_os }}/default/latest/metainfo?arch={{ oneagent_arch }}"
+
+    - name: B. Llamar a la API de Dynatrace y obtener la versión
+      ansible.builtin.uri:
+        url: "{{ metainfo_url }}"
+        method: GET
+        headers:
+          Authorization: "Api-Token {{ dynatrace_api_token }}"   # ← Aquí usamos la credencial inyectada
+        validate_certs: false
+        return_content: true
+      register: dt_api_response
+
+    - name: C. Extraer la última versión disponible
+      ansible.builtin.set_fact:
+        latest_dt_version: "{{ (dt_api_response.content | from_json).latestAgentVersion }}"
+
+    - name: D. Mostrar la última versión de OneAgent disponible
+      ansible.builtin.debug:
+        msg: "La última versión de OneAgent disponible es: {{ latest_dt_version }}"
+
+#================================================================================
+
+- name: 2. VERIFICAR VERSION INSTALADA EN HOSTS LINUX
+  hosts: template_rhel_9
+  become: yes
+  gather_facts: false
+
+  # Proxy a nivel de play (aplica a todas las tareas)
+  environment:
+    http_proxy: "http://10.0.14.10:8110"
+    https_proxy: "http://10.0.14.10:8110"
+
+  vars:
+    oneagent_environment_url: "https://djt24293.live.dynatrace.com"
+    installer_dir: "/tmp"
+    installer_name: "Dynatrace-OneAgent-Linux.sh"
+
+  tasks:
+    - name: Obtener versión instalada de OneAgent
+      command: /opt/dynatrace/oneagent/agent/tools/oneagentctl --version
+      register: local_version
+      ignore_errors: yes
+
+    - name: Descargar instalador OneAgent Linux
+      ansible.builtin.get_url:
+        url: "{{ oneagent_environment_url }}/api/v1/deployment/installer/agent/unix/default/latest?arch=x86"
+        headers:
+          Authorization: "Api-Token {{ dynatrace_api_token }}"   # ← Usamos la credencial inyectada
+        dest: "{{ installer_dir }}/{{ installer_name }}"
+        mode: '0755'
+
+    - name: Mostrar versiones actuales instaladas
+      debug:
+        msg:
+          - "Versión instalada: {{ local_version.stdout | default('none') }}"
+

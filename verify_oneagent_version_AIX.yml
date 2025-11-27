@@ -79,7 +79,7 @@
     #    dest: "{{ installer_dir }}/{{ installer_name }}"
     #    mode: '0755'
 
-     - name: Mostrar estado del agente
+    - name: Mostrar estado del agente
       ansible.builtin.debug:
         msg: >-
           {% if oneagent_bin.stat.exists %}

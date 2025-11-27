@@ -25,7 +25,7 @@
         url: "{{ metainfo_url }}"
         method: GET
         headers:
-          Authorization: "Api-Token {{ dynatrace_api_token_linux }}"   # ← Aquí usamos la credencial inyectada
+          Authorization: "Api-Token {{ dynatrace_api_token }}"   # ← Aquí usamos la credencial inyectada
         validate_certs: false
         return_content: true
       register: dt_api_response
@@ -71,7 +71,7 @@
 #      ansible.builtin.get_url:
 #        url: "{{ oneagent_environment_url }}/api/v1/deployment/installer/agent/unix/default/latest?arch=x86"
 #        headers:
-#          Authorization: "Api-Token {{ dynatrace_api_token_linux }}"   # ← Usamos la credencial inyectada
+#          Authorization: "Api-Token {{ dynatrace_api_token }}"   # ← Usamos la credencial inyectada
 #        dest: "{{ installer_dir }}/{{ installer_name }}"
 #        mode: '0755'
 

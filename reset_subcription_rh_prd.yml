@@ -1,0 +1,27 @@
+---
+- name: Reconfigurar suscripción Red Hat en PROD
+  hosts: template_rhel_9
+  become: true
+  vars:
+    proxy_url: "10.0.14.10:8110"
+  tasks:
+    - name: Eliminar todas las suscripciones
+      ansible.builtin.command: >
+        subscription-manager remove --all --proxy={{ proxy_url }}
+      ignore_errors: true
+
+    - name: Desregistrar el sistema
+      ansible.builtin.command: >
+        subscription-manager unregister --proxy={{ proxy_url }}
+      ignore_errors: true
+
+    - name: Limpiar configuración de subscription-manager
+      ansible.builtin.command: subscription-manager clean
+
+    - name: Registrar el sistema en Red Hat
+      community.general.redhat_subscription:
+        state: present
+        username: "{{ rhsm_username }}"
+        password: "{{ rhsm_password }}"
+        proxy_hostname: "{{ proxy_url }}"
+        force_register: true

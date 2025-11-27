@@ -61,13 +61,13 @@
       register: local_version
       ignore_errors: yes
 
-    - name: Descargar instalador OneAgent Linux
-      ansible.builtin.get_url:
-        url: "{{ oneagent_environment_url }}/api/v1/deployment/installer/agent/unix/default/latest?arch=x86"
-        headers:
-          Authorization: "Api-Token {{ dynatrace_api_token }}"   # ← Usamos la credencial inyectada
-        dest: "{{ installer_dir }}/{{ installer_name }}"
-        mode: '0755'
+#    - name: Descargar instalador OneAgent Linux
+#      ansible.builtin.get_url:
+#        url: "{{ oneagent_environment_url }}/api/v1/deployment/installer/agent/unix/default/latest?arch=x86"
+#        headers:
+#          Authorization: "Api-Token {{ dynatrace_api_token }}"   # ← Usamos la credencial inyectada
+#        dest: "{{ installer_dir }}/{{ installer_name }}"
+#        mode: '0755'
 
     - name: Mostrar versiones actuales instaladas
       debug:

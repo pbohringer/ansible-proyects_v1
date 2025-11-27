@@ -64,11 +64,11 @@
       ansible.builtin.stat:
         path: /opt/dynatrace/oneagent/agent/tools/oneagentctl
       register: oneagent_bin
-	  
+
     - name: Obtener versión instalada de OneAgent (si existe)
-      command: /opt/dynatrace/oneagent/agent/tools/oneagentctl --version
+      ansible.builtin.command: /opt/dynatrace/oneagent/agent/tools/oneagentctl --version
       register: local_version
-	  when: oneagent_bin.stat.exists
+      when: oneagent_bin.stat.exists
       ignore_errors: yes
 
     #- name: Descargar instalador OneAgent AIX

@@ -20,13 +20,13 @@
   tasks:
     - name: A. Construir URL de Metadatos de la API
       ansible.builtin.set_fact:
-        metainfo_url: "https://{{ dt_environment_id }}.{{ dt_domain }}/api/v1/deployment/installer/agent/{{ oneagent_os }}/default/latest/metainfo?arch={{ oneagent_arch }}&Api-Token={{ dt_api_token }}"
+        metainfo_url: "https://{{ dt_environment_id }}.{{ dt_domain }}/api/v1/deployment/installer/agent/{{ oneagent_os }}/default/latest/metainfo?arch={{ oneagent_arch }}"
 
     - name: B. Llamar a la API de Dynatrace y obtener la versión
       ansible.builtin.uri:
         url: "{{ metainfo_url }}"
         method: GET
-		headers:
+        headers:
           Authorization: "Api-Token {{ dynatrace_api_token }}"   # ← Aquí usamos la credencial inyectada
         validate_certs: false
         return_content: true
@@ -39,6 +39,7 @@
     - name: D. Mostrar la última versión de OneAgent disponible
       ansible.builtin.debug:
         msg: "La última versión de OneAgent disponible es: {{ latest_dt_version }}"
+
 
 
 #========================================================================================

@@ -56,9 +56,15 @@
     installer_name: "Dynatrace-OneAgent-Linux.sh"
 
   tasks:
-    - name: Obtener versión instalada de OneAgent
-      command: /opt/dynatrace/oneagent/agent/tools/oneagentctl --version
+    - name: Validar si el binario de OneAgent existe
+      ansible.builtin.stat:
+        path: /opt/dynatrace/oneagent/agent/tools/oneagentctl
+      register: oneagent_bin
+
+    - name: Obtener versión instalada de OneAgent (si existe)
+      ansible.builtin.command: /opt/dynatrace/oneagent/agent/tools/oneagentctl --version
       register: local_version
+      when: oneagent_bin.stat.exists
       ignore_errors: yes
 
 #    - name: Descargar instalador OneAgent Linux
@@ -69,8 +75,12 @@
 #        dest: "{{ installer_dir }}/{{ installer_name }}"
 #        mode: '0755'
 
-    - name: Mostrar versiones actuales instaladas
-      debug:
-        msg:
-          - "Versión instalada: {{ local_version.stdout | default('none') }}"
+    - name: Mostrar estado del agente
+      ansible.builtin.debug:
+        msg: >-
+          {% if oneagent_bin.stat.exists %}
+            Versión instalada: {{ local_version.stdout | default('Error al obtener versión') }}
+          {% else %}
+            OneAgent NO está instalado en este host.
+          {% endif %}
 

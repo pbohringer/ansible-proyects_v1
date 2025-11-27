@@ -1,0 +1,57 @@
+---
+- name: Reconfigurar suscripción Red Hat en PROD (sin community.general)
+  hosts: template_rhel_9
+  become: true
+  vars:
+    proxy_hostport: "10.0.14.10:8110"
+    proxy_url_http: "http://10.0.14.10:8110"
+    proxy_url_https: "http://10.0.14.10:8110"
+  tasks:
+    - name: Exportar variables de entorno en la sesión del job
+      ansible.builtin.shell: |
+        export http_proxy="{{ proxy_url_http }}"
+        export https_proxy="{{ proxy_url_https }}"
+        echo "http_proxy=$http_proxy https_proxy=$https_proxy"
+      args:
+        executable: /bin/bash
+
+    - name: Remover todas las suscripciones
+      ansible.builtin.command: subscription-manager remove --all --proxy={{ proxy_hostport }}
+      register: remove_out
+      failed_when: false
+
+    - name: Mostrar salida remove
+      ansible.builtin.debug:
+        var: remove_out.stdout_lines
+
+    - name: Desregistrar el sistema
+      ansible.builtin.command: subscription-manager unregister --proxy={{ proxy_hostport }}
+      register: unregister_out
+      failed_when: false
+
+    - name: Mostrar salida unregister
+      ansible.builtin.debug:
+        var: unregister_out.stdout_lines
+
+    - name: Limpiar configuración de subscription-manager
+      ansible.builtin.command: subscription-manager clean
+      register: clean_out
+      failed_when: false
+
+    - name: Mostrar salida clean
+      ansible.builtin.debug:
+        var: clean_out.stdout_lines
+
+    - name: Registrar el sistema en Red Hat (username/password + proxy)
+      ansible.builtin.command: >
+        subscription-manager register
+        --username={{ rhsm_username }}
+        --password={{ rhsm_password }}
+        --proxy={{ proxy_hostport }}
+        --force
+      register: register_out
+      changed_when: "'The system has been registered' in register_out.stdout or 'The system has been registered' in register_out.stderr"
+
+    - name: Mostrar salida register
+      ansible.builtin.debug:
+        var: register_out.stdout_lines

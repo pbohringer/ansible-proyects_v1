@@ -1,3 +1,4 @@
+
 ---
 # File: rhel-patch.yml
 # Playbook AAP dedicado exclusivamente a parches de RHEL 8 y 9
@@ -30,11 +31,11 @@
         update_cache: true
       register: dnf_update
 
-    - name: Mostrar número y lista de paquetes actualizados
+    - name: Mostrar número y lista (máx. 10) de paquetes actualizados
       ansible.builtin.debug:
         msg: |
           {{ inventory_hostname }} → {{ dnf_update.results | length }} paquetes actualizados
-          {{ dnf_update.results | map(attribute='name') | join(', ') if dnf_update.results else 'Ninguno' }}
+          {{ (dnf_update.results | map(attribute='name') | list | slice(0,10) | join(', ')) if dnf_update.results else 'Ninguno' }}
 
     - name: Comprobar si el sistema marcó reboot-required
       ansible.builtin.stat:
@@ -50,6 +51,13 @@
     - name: Determinar si es necesario reiniciar
       ansible.builtin.set_fact:
         need_reboot: "{{ reboot_flag.stat.exists or kernel_updated }}"
+
+    - name: Aviso previo al reinicio
+      ansible.builtin.debug:
+        msg: "Reiniciando {{ inventory_hostname }} porque se detectó kernel actualizado o flag reboot-required"
+      when:
+        - need_reboot
+        - perform_reboot | bool
 
     - name: Reiniciar el sistema si es necesario y está permitido
       ansible.builtin.reboot:

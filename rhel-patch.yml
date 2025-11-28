@@ -5,7 +5,7 @@
 # Uso típico: Job Template mensual + Survey con opción de reboot
 
 - name: Parchado Trimestral de RHEL 8 y 9 (AAP)
-  hosts: all
+  hosts: template_rhel_9
   become: true
   gather_facts: true
 

@@ -1,0 +1,73 @@
+---
+# File: rhel-patch.yml
+# Playbook AAP dedicado exclusivamente a parches de RHEL 8 y 9
+# Uso típico: Job Template mensual + Survey con opción de reboot
+
+- name: Parchado Trimestral de RHEL 8 y 9 (AAP)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    perform_reboot: false          # Se controla desde Survey en AAP
+    reboot_timeout: 900
+
+  pre_tasks:
+    - name: Validar que solo se ejecute en RHEL 8 o 9
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "RedHat"
+          - ansible_distribution_major_version is regex("8|9")
+        fail_msg: "Este playbook solo es válido para RHEL 8 y 9"
+        success_msg: "Sistema validado: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+  tasks:
+
+    - name: Actualizar todos los paquetes disponibles
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+      register: dnf_update
+
+    - name: Mostrar número y lista de paquetes actualizados
+      ansible.builtin.debug:
+        msg: |
+          {{ inventory_hostname }} → {{ dnf_update.results | length }} paquetes actualizados
+          {{ dnf_update.results | map(attribute='name') | join(', ') if dnf_update.results else 'Ninguno' }}
+
+    - name: Comprobar si el sistema marcó reboot-required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_flag
+
+    - name: Detectar actualización de kernel (método fiable)
+      ansible.builtin.set_fact:
+        kernel_updated: >-
+          {{ dnf_update.results is defined and
+             dnf_update.results | selectattr('name', 'search', '^kernel(-core)?-') | list | length > 0 }}
+
+    - name: Determinar si es necesario reiniciar
+      ansible.builtin.set_fact:
+        need_reboot: "{{ reboot_flag.stat.exists or kernel_updated }}"
+
+    - name: Reiniciar el sistema si es necesario y está permitido
+      ansible.builtin.reboot:
+        reboot_timeout: "{{ reboot_timeout }}"
+        connect_timeout: 30
+        pre_reboot_delay: 15
+        post_reboot_delay: 60
+        test_command: whoami
+      when:
+        - need_reboot
+        - perform_reboot | bool
+
+  post_tasks:
+    - name: Resumen final del parcheo
+      ansible.builtin.debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          Estado: COMPLETADO
+          Paquetes actualizados: {{ dnf_update.results | default([]) | length }}
+          Reboot necesario: {{ 'SÍ' if need_reboot else 'NO' }}
+          Reboot ejecutado: {{ 'SÍ' if (need_reboot and perform_reboot|bool) else 'NO' }}

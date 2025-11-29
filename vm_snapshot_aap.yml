@@ -1,0 +1,81 @@
+---
+- name: Detectar nombre VM y crear snapshot seguro en AAP 2.5
+  hosts: servidores_linux_vmware  # Grupo de inventario en AAP
+  gather_facts: yes
+  serial: 1  # Una VM a la vez para no saturar vCenter
+  vars:
+    snapshot_name: "Pre-Mantenimiento-{{ ansible_date_time.date }}"
+    snapshot_description: "Snapshot automático AAP - {{ ansible_date_time.iso8601 }}"
+    max_snap_age_hours: 72
+
+  tasks:
+    - name: Cargar fact custom para nombre real en vCenter (de la colección)
+      vmware_vm_name:  # Ahora es mi_namespace.vmware_utils.vmware_vm_name
+      register: vm_discover
+      changed_when: false
+
+    - name: Set fact con nombre detectado (fallback a hostname)
+      set_fact:
+        vm_name_vcenter: "{{ ansible_facts.vmware_vm_name | default(inventory_hostname) }}"
+
+    - name: Debug: Nombre detectado
+      debug:
+        msg: "Host {{ inventory_hostname }} → VM en vCenter: {{ vm_name_vcenter }}"
+
+    - name: Manejar snapshots (delegado a localhost, usa credenciales AAP)
+      block:
+        - name: Obtener snapshots actuales
+          community.vmware.vmware_guest_snapshot_info:
+            validate_certs: no
+            datacenter: "{{ datacenter | default(omit) }}"  # De vars de AAP
+            name: "{{ vm_name_vcenter }}"
+            delegate_to: localhost
+          register: snap_info
+
+        - name: Esperar fin de Veeam (reintentos)
+          community.vmware.vmware_guest_snapshot_info:
+            validate_certs: no
+            datacenter: "{{ datacenter | default(omit) }}"
+            name: "{{ vm_name_vcenter }}"
+            delegate_to: localhost
+          register: veeam_check
+          until: >
+            (veeam_check.instance.snapshots | default([]) |
+             selectattr('name', 'match', '.*(Veeam|VEEAM|VB&R).*') | list | length) == 0
+          retries: 120
+          delay: 30
+
+        - name: Eliminar snaps viejos (> {{ max_snap_age_hours }} horas)
+          community.vmware.vmware_guest_snapshot:
+            validate_certs: no
+            datacenter: "{{ datacenter | default(omit) }}"
+            name: "{{ vm_name_vcenter }}"
+            snapshot_name: "{{ item.name }}"
+            state: absent
+            remove_children: yes
+            delegate_to: localhost
+          loop: "{{ veeam_check.instance.snapshots | default([]) }}"
+          when: >
+            (ansible_date_time.epoch | int - item.created) > (max_snap_age_hours * 3600)
+          ignore_errors: yes
+
+        - name: Crear nuevo snapshot
+          community.vmware.vmware_guest_snapshot:
+            validate_certs: no
+            datacenter: "{{ datacenter | default(omit) }}"
+            name: "{{ vm_name_vcenter }}"
+            snapshot_name: "{{ snapshot_name }}"
+            description: "{{ snapshot_description }}"
+            memory: false
+            quiesce: false
+            state: present
+            delegate_to: localhost
+          register: snap_result
+
+        - name: Confirmación
+          debug:
+            msg: "Snapshot '{{ snapshot_name }}' creado en {{ vm_name_vcenter }}"
+
+      run_once: false  # Por host
+      vars:
+        ansible_connection: local  # Para tasks delegados

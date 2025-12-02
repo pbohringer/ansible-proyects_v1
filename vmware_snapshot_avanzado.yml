@@ -1,18 +1,13 @@
 ---
-- name: Snapshot VMware Avanzado por hostname SO (con Veeam y limpieza)
+- name: Snapshot VMware Avanzado - Custom Credential
   hosts: all
   gather_facts: no
   vars:
-    vcenter_hostname: "{{ vcenter_hostname }}"
-    vcenter_username: "{{ vcenter_username }}"
-    vcenter_password: "{{ vault_vcenter_password }}"  # Usa Vault
     snapshot_name: "Ansible-Snap-PreBackup-{{ ansible_date_time.iso8601_basic_short }}"
-    snapshot_description: "Snapshot Ansible - {{ inventory_hostname }} - {{ ansible_date_time.date }}"
-    snapshot_memory: false
-    snapshot_quiesce: false  # Requiere VMware Tools para quiesce
+    snapshot_description: "Snapshot Ansible - {{ inventory_hostname }}"
 
   tasks:
-    - name: Login a vCenter y obtener token
+    - name: Login a vCenter
       delegate_to: localhost
       vmware.vmware_rest.vcenter_token:
         vcenter_hostname: "{{ vcenter_hostname }}"

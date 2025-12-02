@@ -3,8 +3,8 @@
   hosts: all
   gather_facts: no
   vars:
-    vcenter_hostname: "vcenter.tudominio.com"  # Pásalo como extra_var si varía
-    vcenter_username: "administrator@vsphere.local"
+    vcenter_hostname: "{{ vcenter_hostname }}"
+    vcenter_username: "{{ vcenter_username }}"
     vcenter_password: "{{ vault_vcenter_password }}"  # Usa Vault
     snapshot_name: "Ansible-Snap-PreBackup-{{ ansible_date_time.iso8601_basic_short }}"
     snapshot_description: "Snapshot Ansible - {{ inventory_hostname }} - {{ ansible_date_time.date }}"

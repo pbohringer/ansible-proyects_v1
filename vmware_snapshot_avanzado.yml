@@ -1,6 +1,6 @@
 ---
 - name: Snapshot VMware Avanzado - Custom Credential
-  hosts: all
+  hosts: template_rhel_9
   gather_facts: no
   vars:
     snapshot_name: "Ansible-Snap-PreBackup-{{ ansible_date_time.iso8601_basic_short }}"

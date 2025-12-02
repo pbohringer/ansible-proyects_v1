@@ -1,0 +1,111 @@
+---
+- name: Snapshot VMware Avanzado por hostname SO (con Veeam y limpieza)
+  hosts: all
+  gather_facts: no
+  vars:
+    vcenter_hostname: "vcenter.tudominio.com"  # Pásalo como extra_var si varía
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "{{ vault_vcenter_password }}"  # Usa Vault
+    snapshot_name: "Ansible-Snap-PreBackup-{{ ansible_date_time.iso8601_basic_short }}"
+    snapshot_description: "Snapshot Ansible - {{ inventory_hostname }} - {{ ansible_date_time.date }}"
+    snapshot_memory: false
+    snapshot_quiesce: false  # Requiere VMware Tools para quiesce
+
+  tasks:
+    - name: Login a vCenter y obtener token
+      delegate_to: localhost
+      vmware.vmware_rest.vcenter_token:
+        vcenter_hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+      register: vcenter_login
+
+    - name: Buscar VM por guest hostname = inventory_hostname
+      delegate_to: localhost
+      vmware.vmware_rest.vcenter_vm_info:
+        vcenter_hostname: "{{ vcenter_hostname }}"
+        session: "{{ vcenter_login.access_token }}"
+        filter_guest_host_name: "{{ inventory_hostname }}"
+      register: vm_search
+      retries: 3
+      delay: 5
+      until: vm_search.value | length > 0
+
+    - name: Fallar si VM no encontrada
+      fail:
+        msg: "VM no encontrada para {{ inventory_hostname }} en vCenter"
+      when: vm_search.value | length == 0
+
+    - name: Set VM MOID
+      set_fact:
+        vm_moid: "{{ vm_search.value[0].vm }}"
+
+    - name: Debug VM encontrada
+      debug:
+        msg: "VM: {{ vm_search.value[0].name }} (MOID: {{ vm_moid }}) para {{ inventory_hostname }}"
+
+    - name: Obtener snapshots actuales
+      delegate_to: localhost
+      vmware.vmware_rest.vcenter_vm_snapshot_info:
+        vcenter_hostname: "{{ vcenter_hostname }}"
+        session: "{{ vcenter_login.access_token }}"
+        vm: "{{ vm_moid }}"
+      register: snap_info
+
+    - name: Detectar Veeam activo
+      set_fact:
+        veeam_running: >-
+          {{ (snap_info.value or []) | json_query('[?snapshots[?contains(name, `VEEAM`) || contains(name, `Veeam`) || contains(description, `Veeam`)]].id') | length > 0 }}
+
+    - name: Esperar fin de Veeam (max 30 min)
+      when: veeam_running
+      block:
+        - name: Loop espera Veeam
+          vmware.vmware_rest.vcenter_vm_snapshot_info:
+            vcenter_hostname: "{{ vcenter_hostname }}"
+            session: "{{ vcenter_login.access_token }}"
+            vm: "{{ vm_moid }}"
+          register: snap_check
+          until: >-
+            ((snap_check.value or []) | json_query('[?snapshots[?contains(name, `VEEAM`) || contains(name, `Veeam`) || contains(description, `Veeam`)]].id') | length) == 0
+          retries: 180
+          delay: 10
+          delegate_to: localhost
+        - debug:
+            msg: "Veeam terminado para {{ inventory_hostname }}"
+
+    - name: Buscar snapshots viejos de Ansible
+      set_fact:
+        old_snaps: >-
+          {{ (snap_info.value or []) | json_query('[?snapshots[?starts_with(name, `Ansible-Snap`) || contains(name, `PreBackup`)]] | [0].snapshots[?starts_with(name, `Ansible-Snap`) || contains(name, `PreBackup`)].id') | flatten | unique }}
+
+    - name: Eliminar snapshots viejos
+      when: old_snaps | length > 0
+      loop: "{{ old_snaps }}"
+      loop_control:
+        label: "Borrando {{ item }} en {{ inventory_hostname }}"
+      vmware.vmware_rest.vcenter_vm_snapshot:
+        vcenter_hostname: "{{ vcenter_hostname }}"
+        session: "{{ vcenter_login.access_token }}"
+        vm: "{{ vm_moid }}"
+        snapshot: "{{ item }}"
+        state: absent
+      delegate_to: localhost
+
+    - name: Crear snapshot nuevo
+      delegate_to: localhost
+      vmware.vmware_rest.vcenter_vm_snapshot:
+        vcenter_hostname: "{{ vcenter_hostname }}"
+        session: "{{ vcenter_login.access_token }}"
+        vm: "{{ vm_moid }}"
+        name: "{{ snapshot_name }}"
+        description: "{{ snapshot_description }}"
+        memory: "{{ snapshot_memory }}"
+        quiesced: "{{ snapshot_quiesce }}"
+        state: present
+      register: new_snap
+
+    - name: Éxito
+      debug:
+        msg: "Snapshot creado: {{ snapshot_name }} en {{ inventory_hostname }} (ID: {{ new_snap.id }})"

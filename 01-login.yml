@@ -1,4 +1,3 @@
-# 01-login.yml → Versión corregida y funcional en AAP 2.5 (vmware.vmware_rest 4.6.0)
 ---
 - name: 01 - Login a vCenter (solo prueba)
   hosts: localhost
@@ -15,12 +14,20 @@
       no_log: true
 
     - name: Validar que el login fue exitoso
-      fail:
+      ansible.builtin.fail:
         msg: "ERROR: No se pudo autenticar contra vCenter {{ vcenter_hostname }}"
       when: vcenter_login is failed or vcenter_login.session_id is not defined
 
+    - name: Calcular minutos restantes antes de la expiración del token
+      set_fact:
+        session_minutes: >-
+          {{
+            (
+              (vcenter_login.expiry_time | to_datetime).timestamp() -
+              (ansible_date_time.epoch | int)
+            ) // 60
+          }}
+
     - name: Mostrar información del token/sesión
       debug:
-        msg: >-
-          Login OK → sesión válida por aproximadamente 
-          {{ (vcenter_login.expires_at | default(0)) // 60 - (ansible_date_time.epoch | int) // 60 }} minutos
+        msg: "Login OK → sesión válida por aproximadamente {{ session_minutes }} minutos"

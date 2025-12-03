@@ -1,0 +1,16 @@
+# 01-login.yml  → Solo hace login y muestra el token (seguro)
+---
+- name: 01 - Login a vCenter (solo prueba)
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Login y obtener token
+      vmware.vmware_rest.vcenter_token:
+        vcenter_hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+      register: vcenter_login
+
+    - debug:
+        msg: "Login OK → token válido por {{ vcenter_login.expires_in // 60 }} minutos"

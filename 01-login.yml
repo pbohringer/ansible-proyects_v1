@@ -1,22 +1,26 @@
-# 01-login.yml  → Solo hace login y muestra el token (seguro)
+# 01-login.yml → Versión corregida y funcional en AAP 2.5 (vmware.vmware_rest 4.6.0)
 ---
 - name: 01 - Login a vCenter (solo prueba)
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
+
   tasks:
-    - name: Login y obtener token
-      vmware.vmware_rest.vcenter_token:
+    - name: Crear sesión en vCenter (nuevo módulo desde 3.0.0+)
+      vmware.vmware_rest.vcenter_session:
         vcenter_hostname: "{{ vcenter_hostname }}"
-        username: "{{ vcenter_username }}"
-        password: "{{ vcenter_password }}"
-        validate_certs: no
+        vcenter_username: "{{ vcenter_username }}"
+        vcenter_password: "{{ vcenter_password }}"
+        vcenter_validate_certs: false
       register: vcenter_login
-      no_log: true     # evita que aparezcan credenciales/token
+      no_log: true
 
-    - name: Validar login exitoso
+    - name: Validar que el login fue exitoso
       fail:
-        msg: "ERROR: No se pudo generar token desde vCenter"
-      when: vcenter_login is failed
+        msg: "ERROR: No se pudo autenticar contra vCenter {{ vcenter_hostname }}"
+      when: vcenter_login is failed or vcenter_login.session_id is not defined
 
-    - debug:
-        msg: "Login OK → token válido por {{ vcenter_login.expires_in // 60 }} minutos"
+    - name: Mostrar información del token/sesión
+      debug:
+        msg: >-
+          Login OK → sesión válida por aproximadamente 
+          {{ (vcenter_login.expires_at | default(0)) // 60 - (ansible_date_time.epoch | int) // 60 }} minutos

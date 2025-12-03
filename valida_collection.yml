@@ -1,0 +1,9 @@
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Listar colecciones disponibles
+      command: ansible-galaxy collection list
+      register: out
+
+    - debug:
+        var: out.stdout_lines

@@ -3,6 +3,9 @@
   hosts: localhost
   gather_facts: false
 
+  collections:
+    - vmware.vmware_rest
+  
   tasks:
     - name: Crear sesión en vCenter (nuevo módulo desde 3.0.0+)
       vmware.vmware_rest.vcenter_session:

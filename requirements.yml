@@ -1,3 +1,4 @@
 collections:
   - name: vmware.vmware_rest
-    source: https://galaxy.ansible.com
+    version: 4.6.0
+

@@ -8,7 +8,7 @@
   
   tasks:
     - name: Crear sesión en vCenter (nuevo módulo desde 3.0.0+)
-      vmware.vmware_rest.vcenter_session:
+      vcenter_session:
         vcenter_hostname: "{{ vcenter_hostname }}"
         vcenter_username: "{{ vcenter_username }}"
         vcenter_password: "{{ vcenter_password }}"

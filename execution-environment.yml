@@ -1,0 +1,9 @@
+version: 3
+
+dependencies:
+  galaxy: requirements.yml
+  python: requirements.txt
+
+images:
+  base_image:
+    name: registry.redhat.io/ansible-automation-platform-25/ee-supported-rhel8:latest
